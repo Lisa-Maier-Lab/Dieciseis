@@ -1,0 +1,6 @@
+samplename	forward	reverse
+2108-lm-d1-001_S1	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-001_S1_R1_001.fastq.gz	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-001_S1_R2_001.fastq.gz
+2108-lm-d1-009_S9	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-009_S9_R1_001.fastq.gz	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-009_S9_R2_001.fastq.gz
+2108-lm-d1-017_S17	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-017_S17_R1_001.fastq.gz	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-017_S17_R2_001.fastq.gz
+2108-lm-d1-021_S21	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-021_S21_R1_001.fastq.gz	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-021_S21_R2_001.fastq.gz
+2108-lm-d1-028_S28	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-028_S28_R1_001.fastq.gz	/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs/2108-lm-d1-028_S28_R2_001.fastq.gz

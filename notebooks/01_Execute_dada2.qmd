@@ -1,0 +1,477 @@
+---
+title: "Process 16S data using DADA2"
+format: html
+---
+
+# Aim
+
+Jacobo de la Cuesta-Zuluaga. December 2023.
+
+This notebook illustrates how to process raw 16S rRNA gene amplicons using `DADA2`,
+from the cleaning of raw sequences, the identification of amplicon sequence variants
+(ASVs) and their general taxonomic classification.
+
+If you are processing sequences from a synthetic community such as Com20, you
+will need to run the second notebook `NAME OF NOTEBOOK` which covers a more specific
+taxonomic classification and the collapsing the abundance of ASVs according by
+species.
+
+For tutorials and explanations of the steps, see:
+https://benjjneb.github.io/dada2/tutorial_1_8.html 
+https://alexiscarter.github.io/metab/Dada_script_EN.html
+
+# Libraries
+
+The following libraries are required for the present workflow
+
+```{r}
+library(tidyverse)
+library(dada2)
+library(DECIPHER)
+library(ape)
+library(Biostrings)
+library(digest)
+library(phangorn)
+library(conflicted)
+```
+
+
+```{r}
+# Solve conflics with certain function names
+conflict_prefer("filter", "dplyr")
+conflict_prefer("slice", "dplyr")
+conflict_prefer("rename", "dplyr")
+conflict_prefer("setdiff", "base")
+```
+
+```{r}
+# Load helper functions
+source("../bin/Helper_functions.R")
+```
+
+
+# Paths
+```{r}
+Check_point("Are the base and out directories filled?")
+# TODO make sure the directories are correct
+# 
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+base_dir = "/mnt/volume_main_2/dm_main/projects/Small_projects/Dieciseis_out"
+
+# TODO make sure the out directory is correct
+out_dir = file.path(base_dir, "dada2_out")
+dir.create(out_dir)
+
+# Out dir
+tables_dir = file.path(base_dir, "clean_tables")
+dir.create(tables_dir)
+
+# Filtered sequences
+filt_seqs_dir = tempdir()
+```
+
+```{r}
+Check_point("Is the path to the samples file correct?")
+# TODO make sure the path to the samples file is correct
+#
+#
+#
+#
+#
+#
+samples_file =  "../test/test_samplesfile.tsv"
+
+samples_df = samples_file %>% 
+  read_tsv()
+```
+
+
+```{r}
+Check_point("Is the path to the reference files correct?")
+# Reference dbs
+#
+#
+#
+#
+#
+#
+ref_dir = "../reference_files"
+
+gtdb_tax = file.path(ref_dir, "gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna.gz")
+gtdb_species = file.path(ref_dir, "gtdb-sbdi-sativa.r06rs202.addSpecies.fna.gz")
+# # TODO make sure the corresponding taxonomy files are loaded
+# # This is only valid if using a defined community (e.g. Com20, EED)
+# EED_species =  file.path(ref_dir, "COM20_GTDB_addSpecies.fna")
+# EED_ref_taxonomy = read_tsv(file.path(ref_dir, "COM20_GTDB_Taxonomy.txt")) %>% 
+#   select(GTDB_Taxonomy) %>% 
+#   separate(GTDB_Taxonomy, into = c("Genus", "Species"), sep = " ", remove = FALSE)
+```
+
+*Note* that I had to manually change the GTDB reference files. This is already
+fixed but it is here just as reference. You don't need to modify these files
+further.
+
+The files were originally obtained from:
+https://scilifelab.figshare.com/articles/dataset/SBDI_Sativa_curated_16S_GTDB_database/14869077 (June 2022).
+
+They have a double domain entry because the authors of these files require them in such way for their pipeline.
+However, this leads to problems when used directly on dada2.
+
+To fix, I used the following commands:
+
+```
+zcat gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fna.gz | sed -E 's~>Bacteria;|>Archaea;~>~' | sed '/>.*/s/$/;/' > gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna
+gzip gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna
+```
+
+# Check forward and reverse files
+```{r}
+# List files in raw sequences dir
+forward_reads = samples_df$forward
+  
+reverse_reads = samples_df$reverse
+  
+# TODO make sure that the F and R read patterns are filled
+Check_point("If the correct file name pattern for Forward and Reverse reads added?")
+
+forward_pattern = "_R1_001.fastq.gz"
+reverse_pattern = "_R2_001.fastq.gz"
+
+# Make sure the corresponding F and R files are present
+forward_names = forward_reads %>% 
+  basename() %>% 
+  str_remove(forward_pattern) #
+
+reverse_names = reverse_reads %>% 
+  basename() %>% 
+  str_remove(reverse_pattern)
+
+# TODO make sure that the file names make sense and that all files are paired
+setdiff(forward_names, reverse_names)
+setdiff(reverse_names, forward_names)
+```
+
+
+# Execute DADA2
+## Check quality of data
+If you have a very large set of samples, you can select a fraction of them
+to perform the visual QC, otherwise it can take a long time. *Note* that this subset
+is not recommended.
+
+```{r}
+# Proportion of reads to randomly select
+# To inspect all samples, use 1
+QC_subset_proportion = 1
+QC_subset_number = length(forward_reads) * QC_subset_proportion
+```
+
+```{r}
+# Obtain quality plots of raw sequences for each of the files
+Raw_QC_plotsF = sample(forward_reads, QC_subset_number) %>%
+  map(., function(fastq) {plotQualityProfile(fastq)})
+
+Raw_QC_plotsR = sample(reverse_reads, QC_subset_number) %>%
+  map(., function(fastq) {plotQualityProfile(fastq)})
+```
+
+```{r fig.height=3, fig.width=5}
+# Print forward plots
+Raw_QC_plotsF_hline = map(Raw_QC_plotsF, function(x) x + geom_hline(yintercept = 30))
+Raw_QC_plotsF_hline
+```
+
+```{r fig.height=3, fig.width=5}
+# Print Rreverse plots
+Raw_QC_plotsR_hline = map(Raw_QC_plotsR, function(x) x + geom_hline(yintercept = 30))
+Raw_QC_plotsR_hline
+```
+
+
+# Filter reads
+```{r}
+# Filtering
+filtered_trimmed = filterAndTrim(fwd = forward_reads, 
+              rev = reverse_reads, 
+              filt = filt_seqs_dir, 
+              filt.rev = filt_seqs_dir,
+              trimLeft = c(23,24), # Trim nucleotides corresponding to primer sequences. To check align primers to raw seqs
+              truncLen=c(225, 200), # Truncation position of F and R
+              maxEE=c(2,2), # Number of expected errors
+              truncQ=11, # Truncate reads at the first instance of a quality score less than
+              rm.phix=TRUE, # filter matches against the phiX
+              compress=TRUE, 
+              verbose=TRUE, 
+              multithread=FALSE)
+```
+
+#  Learn errors
+```{r}
+# List files in filtered sequences dir
+forward_filt_reads = list.files(filt_seqs_dir, pattern = forward_pattern, full.names = TRUE)
+reverse_filt_reads = list.files(filt_seqs_dir, pattern = reverse_pattern, full.names = TRUE)
+
+# Make sure the corresponding F and R files are present
+forward_names_filt = str_remove(basename(forward_filt_reads), forward_pattern)
+reverse_names_filt = str_remove(basename(reverse_filt_reads), reverse_pattern)
+
+setdiff(forward_names_filt, reverse_names_filt)
+setdiff(reverse_names_filt, forward_names_filt)
+
+# Add names to vectors
+names(forward_filt_reads) = forward_names_filt
+names(reverse_filt_reads) = reverse_names_filt
+```
+
+
+## Forward
+```{r}
+# Learn error rates
+set.seed(2112)
+forward_errors = learnErrors(forward_filt_reads, 
+                             nbases = 1e8, 
+                             randomize=TRUE,
+                             multithread=FALSE, 
+                             verbose = TRUE)
+
+```
+
+```{r}
+plotErrors(forward_errors, nominalQ=TRUE)
+```
+
+## Reverse
+```{r}
+reverse_errors = learnErrors(forward_filt_reads, 
+                             nbases = 1e8, 
+                             randomize=TRUE,
+                             multithread=FALSE, 
+                             verbose = TRUE)
+```
+
+```{r}
+plotErrors(reverse_errors, nominalQ=TRUE)
+```
+
+# Infer sequence variants
+## Forward
+```{r}
+forward_derep = map(forward_filt_reads, 
+                    function(filt_fq){derepFastq(filt_fq, verbose = TRUE)})
+
+forward_dada = map(forward_derep, 
+                   function(derep_obj){dada(derep_obj, err=forward_errors, multithread=FALSE, verbose = TRUE)})
+```
+
+## Reverse
+```{r}
+reverse_derep = map(reverse_filt_reads, 
+                    function(filt_fq){derepFastq(filt_fq, verbose = TRUE)})
+
+reverse_dada = map(reverse_derep, 
+                   function(derep_obj){dada(derep_obj, err=reverse_errors, multithread=FALSE, verbose = TRUE)})
+
+```
+
+# Merge paired reads
+```{r}
+merged_reads = mergePairs(forward_dada, 
+                          forward_derep, 
+                          reverse_dada, 
+                          reverse_derep, 
+                          verbose=TRUE)
+```
+
+
+# Construct sequence table
+```{r}
+seq_table_raw = makeSequenceTable(merged_reads)
+dim(seq_table_raw)
+table(nchar(getSequences(seq_table_raw)))
+```
+
+```{r}
+# Remove sequences with length above or below expected size
+Min_len = 250
+Max_len = 254
+
+# TODO Check that the size range makes sense
+Check_point("Was the amplicon size range adjusted accordingly?")
+
+seq_table = seq_table_raw[,nchar(colnames(seq_table_raw)) %in% Min_len:Max_len]
+dim(seq_table)
+table(nchar(getSequences(seq_table)))
+```
+
+
+# Remove chimeras
+```{r}
+seq_table_dechimered <- removeBimeraDenovo(seq_table,
+                                    method="consensus", 
+                                    multithread=FALSE, 
+                                    verbose=TRUE)
+
+# Proportion of non-chimeras
+
+non_chimeras = round(sum(seq_table_dechimered)/sum(seq_table), 3)*100 
+
+# Print
+str_glue("The proportion of non-chimeric sequences was {nonchim}%",
+         nonchim = non_chimeras)
+```
+
+# Number of reads through the pipeline
+```{r}
+getN = function(x) sum(getUniques(x))
+
+Sequence_counts_workflow = filtered_trimmed %>% 
+  as.data.frame() %>% 
+  bind_cols(map_dbl(forward_dada, getN), 
+            map_dbl(reverse_dada, getN),
+            map_dbl(merged_reads, getN),
+            rowSums(seq_table_dechimered)) %>% 
+  rownames_to_column("Sample")
+
+colnames(Sequence_counts_workflow) = c("Sample", "input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+
+
+# Print
+Sequence_counts_workflow
+```
+
+```{r, fig.height=4, fig.width=4}
+Sequence_counts_workflow %>% 
+  pivot_longer(cols = -Sample, names_to = "Step", values_to = "n_reads") %>% 
+  mutate(Step = factor(Step, levels = c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim"))) %>% 
+  ggplot(aes(x = Step, y = n_reads, group = Sample, color = Sample)) +
+    geom_point() +
+    geom_line() +
+    theme_light() +
+    theme(legend.position = "none", axis.text.x = element_text(angle = 20, hjust = 1)) +
+    labs(x = "Workflow Step", y = "Number of reads")
+```
+
+
+# Assign taxonomy
+```{r}
+merged_taxonomy = assignTaxonomy(seq_table_dechimered, 
+                       gtdb_tax,
+                       minBoot=70,
+                       tryRC = TRUE,
+                       multithread=FALSE)
+
+merged_taxonomy_sp_raw = addSpecies(merged_taxonomy, 
+                                    gtdb_species, 
+                                    verbose=TRUE)
+```
+
+```{r}
+# Data frame with taxonomy
+# Add md5 sum for shorter unique ID of sequence
+# Ad ASV#### identifier for ease of use
+merged_taxonomy_sp_tmp = merged_taxonomy_sp_raw %>% 
+  as.data.frame() %>% 
+  rownames_to_column("Seq") %>% 
+  bind_cols(md5 = map_chr(.$Seq, function(x) digest::digest(x, algo = "md5"))) %>% 
+  mutate(ID = 1:nrow(.),
+         ID = str_glue("ASV{id}", id = str_pad(ID, width = 4, pad = "0")), 
+         ID = as.character(ID)) %>% 
+  relocate(ID, md5)
+
+tax_lvl = merged_taxonomy_sp_tmp  %>% 
+  select(-c(ID, md5, Seq)) %>% 
+  mutate_all(function(x) if_else(is.na(x), 0, 1)) %>% 
+  rowSums()
+
+
+# Add full name
+# Add unclassified in case of missing level
+merged_taxonomy_sp = merged_taxonomy_sp_tmp %>% 
+  mutate(full_levels = tax_lvl) %>% 
+  mutate(Name = case_when(full_levels == 1 ~ str_c("Unclassified", Kingdom, sep = " "), 
+                          full_levels == 2 ~ str_c("Unclassified", Phylum, sep = " "),
+                          full_levels == 3 ~ str_c("Unclassified", Class, sep = " "),
+                          full_levels == 4 ~ str_c("Unclassified", Order, sep = " "),
+                          full_levels == 5 ~ str_c("Unclassified", Family, sep = " "),
+                          full_levels == 6 ~ str_c("Unclassified", Genus, sep = " "),
+                          full_levels == 7 ~ str_c(Genus, Species, sep = " "))) %>% 
+  relocate(ID, Name) %>% 
+  select(-full_levels)
+
+
+
+merged_taxonomy_sp %>% 
+  head()
+```
+
+
+# Construct phylogeny
+From https://compbiocore.github.io/metagenomics-workshop/assets/DADA2_tutorial.html
+```{r}
+# Retrieve sequences
+ASV_seqs = getSequences(seq_table_dechimered)
+names(ASV_seqs) = ASV_seqs
+```
+
+```{r}
+# Align sequences
+ASV_align = DECIPHER::AlignSeqs(Biostrings::DNAStringSet(ASV_seqs))
+
+# Change sequence alignment output into a phyDat structure
+ASV_align_matrix = phangorn::phyDat(as(ASV_align, "matrix"), type="DNA")
+
+# Create distance matrix
+ASV_dist = phangorn::dist.ml(ASV_align_matrix)
+
+#Perform Neighbor joining
+
+ASV_NJ_tree = phangorn::NJ(ASV_dist) # Note, tip order != sequence order
+
+#Internal maximum likelihood
+ASV_ML_fit = phangorn::pml(ASV_NJ_tree, data = ASV_align_matrix)
+
+# negative edges length changed to 0!
+ASV_ML_mod = update(ASV_ML_fit, k=4, inv=0.2)
+ASV_ML_mod = phangorn::optim.pml(ASV_ML_mod, 
+                         model="GTR", 
+                         optInv=TRUE, 
+                         optGamma=TRUE,
+                         rearrangement = "stochastic", 
+                         control = phangorn::pml.control(trace = 0))
+```
+
+
+```{r}
+# Save tree to object
+ASV_ML_tree = ASV_ML_mod$tree
+ASV_ML_tree %>% 
+  class
+```
+
+# Save files
+## Create data frames
+```{r}
+# Make sure sequence in column name corresponds to the taxonomy table
+colnames(seq_table_dechimered) == merged_taxonomy_sp$Seq
+
+# Create ASV table
+# Replace names for ASV ID. Can also be changed to the md5
+ASV_df = seq_table_dechimered %>% 
+  as.data.frame() %>% 
+  rownames_to_column("Sample")
+
+colnames(ASV_df) = c("Sample", merged_taxonomy_sp$ID)
+
+# Print
+ASV_df %>% 
+  head
+```
