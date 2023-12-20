@@ -1,0 +1,159 @@
+---
+title: "Taxonomic classify synthetic communities"
+format: html
+---
+
+# Aim
+
+Jacobo de la Cuesta-Zuluaga. December 2023.
+
+This is the second notebook of the Maier Lab's 16S rRNA amplicon sequencing workflow.
+*Note* that is only needed if you are processing the sequences of a synthetic community
+such as EED or Com20. If you are processing complex samples, e.g. human feces, you
+don't need to run this notebook.
+
+In the last notebook we processed the raw sequences, genertated ASVs and performed
+a general taxonomic classification. Here we will use full-length references to
+classify the sequences of each member of the synthetic community and collapse the
+abundance according to the taxonomic classification by species.
+
+# Libraries
+
+The following libraries are required for the present workflow
+
+```{r}
+library(tidyverse)
+library(Biostrings)
+library(DECIPHER)
+library(ape)
+library(conflicted)
+```
+
+```{r}
+# Load helper functions
+source("../bin/Helper_functions.R")
+```
+
+```{r}
+# Solve conflics with certain function names
+conflict_prefer("filter", "dplyr")
+conflict_prefer("slice", "dplyr")
+conflict_prefer("rename", "dplyr")
+conflict_prefer("setdiff", "base")
+```
+
+# Load files
+```{r}
+Check_point("Are the base and out directories filled?")
+# TODO make sure the directories are correct
+# 
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+base_dir = "/mnt/volume_main_2/dm_main/projects/Small_projects/Dieciseis_out"
+
+out_dir = file.path(base_dir, "dada2_out")
+tables_dir = file.path(base_dir, "clean_tables")
+```
+
+```{r}
+# Load tables
+# ASV table
+ASV_df = file.path(out_dir, "Test_run_ASV_table.tsv") %>% 
+  read_tsv()
+
+# Taxonomy table
+merged_taxonomy_sp = file.path(out_dir, "Test_run_ASV_taxonomy.tsv") %>% 
+  read_tsv()
+```
+
+
+```{r}
+Check_point("Is the path to the reference files correct?")
+# Reference dbs
+#
+#
+#
+#
+#
+#
+ref_dir = "../reference_files"
+
+# Load reference files
+# TODO make sure the corresponding taxonomy files are loaded
+# This is only valid if using a defined community (e.g. Com20, EED)
+SynthCom_species =  file.path(ref_dir, "COM20_GTDB_addSpecies.fna")
+SynthCom_ref_taxonomy = read_tsv(file.path(ref_dir, "COM20_GTDB_Taxonomy.txt")) %>%
+  mutate(GTDB_Taxonomy = str_remove_all(GTDB_Taxonomy, "[a-z]__")) %>%
+  separate(GTDB_Taxonomy, 
+           into = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
+           sep = ";")
+```
+
+
+# Classify 
+
+```{r}
+# Read fasta with full length 16S rRNA sequences of EED species
+SynthCom_full = SynthCom_species %>% 
+  readDNAStringSet() %>% 
+  as.character()
+
+ASV_sequences = merged_taxonomy_sp$Seq
+names(ASV_sequences) = merged_taxonomy_sp$ID
+
+# Combine full and amplicon sequences
+# Convert to DNA stringset
+combined_stringset = c(ASV_sequences, SynthCom_full) %>% 
+  DNAStringSet()
+
+# Align sequences
+combined_alignment = AlignSeqs(combined_stringset, verbose = FALSE)
+
+# Calculate pairwise distances
+combined_distances = combined_alignment %>% 
+  as.DNAbin() %>% 
+  dist.dna(model = "raw")
+```
+
+```{r}
+# Extract distance matrix
+# Long df 
+# Fix names
+# Arrange by distance
+combined_distances_long = combined_distances %>% 
+  as.matrix() %>% 
+  as.data.frame() %>% 
+  rownames_to_column("ASV_query") %>% 
+  pivot_longer(cols = -ASV_query, names_to = "ASV_target", values_to = "Distance") %>%
+  filter(str_detect(ASV_query, "ASV"), 
+         !str_detect(ASV_target, "ASV")) %>% 
+  mutate(ASV_target = word(ASV_target, start = 2, end = -1)) %>% 
+  arrange(ASV_query, Distance)
+
+# Filter to matches with 98 or higher identity
+SynthCom_df_raw = combined_distances_long %>% 
+  filter(Distance <= 0.02) %>% 
+  group_by(ASV_query) %>% 
+  slice(1) %>% 
+  ungroup()
+
+# Merge with taxonomy table and organize column order
+SynthCom_df = SynthCom_df_raw  %>% 
+  left_join(merged_taxonomy_sp, by = c("ASV_query" = "ID")) %>% 
+  select(-Name) %>% 
+  rename("Name" = "ASV_target", "ID" = "ASV_query") %>% 
+  mutate(Species = word(Name, 2)) %>% 
+  relocate(Distance, .after =  last_col()) %>% 
+  arrange(ID)
+
+SynthCom_df
+```

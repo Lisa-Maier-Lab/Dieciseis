@@ -68,7 +68,7 @@ Check_point("Are the base and out directories filled?")
 #
 base_dir = "/mnt/volume_main_2/dm_main/projects/Small_projects/Dieciseis_out"
 
-# TODO make sure the out directory is correct
+# Output directory
 out_dir = file.path(base_dir, "dada2_out")
 dir.create(out_dir)
 
@@ -109,12 +109,6 @@ ref_dir = "../reference_files"
 
 gtdb_tax = file.path(ref_dir, "gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna.gz")
 gtdb_species = file.path(ref_dir, "gtdb-sbdi-sativa.r06rs202.addSpecies.fna.gz")
-# # TODO make sure the corresponding taxonomy files are loaded
-# # This is only valid if using a defined community (e.g. Com20, EED)
-# EED_species =  file.path(ref_dir, "COM20_GTDB_addSpecies.fna")
-# EED_ref_taxonomy = read_tsv(file.path(ref_dir, "COM20_GTDB_Taxonomy.txt")) %>% 
-#   select(GTDB_Taxonomy) %>% 
-#   separate(GTDB_Taxonomy, into = c("Genus", "Species"), sep = " ", remove = FALSE)
 ```
 
 *Note* that I had to manually change the GTDB reference files. This is already
@@ -475,3 +469,32 @@ colnames(ASV_df) = c("Sample", merged_taxonomy_sp$ID)
 ASV_df %>% 
   head
 ```
+
+## Write tables and tree to file
+```{r}
+# TODO Change the file names if needed
+Check_point("Are the file names adjusted?")
+
+# Give a name to your files
+file_prefix = "Test_run"
+
+out_asv_file = paste(file_prefix, "ASV_table.tsv", sep = "_") %>% 
+  file.path(out_dir, .)
+
+out_tax_file = paste(file_prefix, "ASV_taxonomy.tsv", sep = "_") %>% 
+  file.path(out_dir, .)
+
+out_tree_file = paste(file_prefix, "ASV_tree.tre", sep = "_") %>% 
+  file.path(out_dir, .)
+
+write_tsv(ASV_df, out_asv_file)
+write_tsv(merged_taxonomy_sp, out_tax_file)
+ape::write.tree(ASV_ML_tree, file = out_tree_file)
+
+# Optional
+# Save workspace
+# paste(file_prefix, "16S.RData.tsv", sep = "_") %>% 
+#   file.path(out_dir, .) %>% 
+#   save.image(.)
+```
+
