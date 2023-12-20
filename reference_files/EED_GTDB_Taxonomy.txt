@@ -1,0 +1,26 @@
+Number	Name	GTDB_Name	NT_Code
+1	Veillonella atypica	Veillonella atypica	LM0305
+2	Veillonella parvula	Veillonella parvula_A	NT5017
+3	Haemophilus aegypticus	Haemophilus aegyptius	LM0306
+4	Haemophilus parainfluenzae	Haemophilus_D parainfluenzae	NT5018
+5	Porphyromonas asaccharolytica	Porphyromonas asaccharolytica	LM0308
+6	Rothia dentocariosa	Rothia dentocariosa	LM0310
+7	Fusobacterium mortiferum	Fusobacterium_A mortiferum	LM0321
+8	Anaerostipes caccae	Anaerostipes caccae	LM0325
+9	Eubacterium halii	Anaerobutyricum hallii	NT5067
+10	Roseburia intestinalis	Roseburia intestinalis	NT5011
+11	Coprococcus comes	Bariatricus comes	NT5048
+12	Fusobacterium periodonticum	Fusobacterium periodonticum	NT24011
+13	G. elegans	Granulicatella elegans	LM0329
+14	G. adiacens	Granulicatella adiacens	LM0330
+15	P. goodfellowii	Pseudoleptotrichia goodfellowii	LM0331
+16	Lactobacillus mucosae	Limosilactobacillus mucosae	LM0323
+17	Lactobacillus salivarius	Ligilactobacillus salivarius	NT14072
+18	Lactobacillus ruminis	Ligilactobacillus ruminis	NT14073
+19	Streptococcus salivarius	Streptococcus salivarius	NT5038
+20	Streptococcus parasanguinis	Streptococcus parasanguinis	NT5072
+21	Eubacterium rectale	Agathobacter rectalis	NT5009
+22	Bacteroides ovatus	Bacteroides ovatus	NT5054
+23	Fusobacterium nucleatum nucleatum	Fusobacterium nucleatum	NT5025
+24	Prevotella melaninogenica	Prevotella melaninogenica	NT5020
+25	Shigella flexneri	Escherichia coli	NT14114
