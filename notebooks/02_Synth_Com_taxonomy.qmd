@@ -46,22 +46,9 @@ conflict_prefer("setdiff", "base")
 ```{r}
 Check_point("Are the base and out directories filled?")
 # TODO make sure the directories are correct
-# 
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-base_dir = "/mnt/volume_main_2/dm_main/projects/Small_projects/Dieciseis_out"
+base_dir = "../test"
 
-out_dir = file.path(base_dir, "dada2_out")
-tables_dir = file.path(base_dir, "clean_tables")
+out_dir = file.path(base_dir, "dieciseis_out")
 ```
 
 ```{r}
@@ -79,12 +66,6 @@ merged_taxonomy_sp = file.path(out_dir, "Test_run_ASV_taxonomy.tsv") %>%
 ```{r}
 Check_point("Is the path to the reference files correct?")
 # Reference dbs
-#
-#
-#
-#
-#
-#
 ref_dir = "../reference_files"
 
 # Load reference files
@@ -100,7 +81,6 @@ SynthCom_ref_taxonomy = read_tsv(file.path(ref_dir, "COM20_GTDB_Taxonomy.txt")) 
 
 
 # Classify 
-
 ```{r}
 # Read fasta with full length 16S rRNA sequences of EED species
 SynthCom_full = SynthCom_species %>% 
@@ -157,3 +137,47 @@ SynthCom_df = SynthCom_df_raw  %>%
 
 SynthCom_df
 ```
+
+# Collapse abundances
+```{r}
+# Taxonomy of each ASV from the synthetic community
+SynthCom_taxonomy_collapse = SynthCom_df %>% 
+  select(-c(md5, Seq)) %>% 
+  distinct() %>% 
+  arrange(Phylum, Class)
+
+# Long format df with abundance and tax of each species on each sample
+SynthCom_ASV_df = ASV_df %>% 
+  pivot_longer(cols = -Sample, names_to = "ID", values_to = "Reads") %>% 
+  left_join(SynthCom_taxonomy_collapse, by = join_by("ID"))
+
+# Add up abundances of each species on each sample
+SynthCom_colapsed = SynthCom_ASV_df %>% 
+  group_by(Sample, Name) %>% 
+  summarize(Sum_reads = sum(Reads)) %>% 
+  pivot_wider(id_cols = Sample, names_from = Name, values_from = Sum_reads) %>% 
+  ungroup()
+
+# Print
+SynthCom_colapsed %>% 
+  head()
+```
+# Write tables
+```{r}
+# TODO Change the file names if needed
+Check_point("Are the file names adjusted?")
+
+# Give a name to your files
+file_prefix = "Test_run"
+
+out_collapsed_file = paste(file_prefix, "collapsed.tsv", sep = "_") %>% 
+  file.path(out_dir, .)
+
+out_synthcom_tax_file = paste(file_prefix, "exact_tax.tsv", sep = "_") %>% 
+  file.path(out_dir, .)
+
+write_tsv(SynthCom_colapsed, out_collapsed_file)
+write_tsv(SynthCom_df, out_synthcom_tax_file)
+```
+
+

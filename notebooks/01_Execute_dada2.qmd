@@ -52,44 +52,23 @@ source("../bin/Helper_functions.R")
 
 # Paths
 ```{r}
-Check_point("Are the base and out directories filled?")
 # TODO make sure the directories are correct
-# 
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-base_dir = "/mnt/volume_main_2/dm_main/projects/Small_projects/Dieciseis_out"
+Check_point("Are the base and out directories filled?")
+
+base_dir = "../test"
 
 # Output directory
-out_dir = file.path(base_dir, "dada2_out")
-dir.create(out_dir)
-
-# Out dir
-tables_dir = file.path(base_dir, "clean_tables")
-dir.create(tables_dir)
+out_dir = file.path(base_dir, "dieciseis_out")
 
 # Filtered sequences
 filt_seqs_dir = tempdir()
 ```
 
 ```{r}
-Check_point("Is the path to the samples file correct?")
 # TODO make sure the path to the samples file is correct
-#
-#
-#
-#
-#
-#
-samples_file =  "../test/test_samplesfile.tsv"
+Check_point("Is the path to the samples file correct?")
+
+samples_file =  file.path(base_dir, "test_samplesfile.tsv")
 
 samples_df = samples_file %>% 
   read_tsv()
@@ -97,14 +76,10 @@ samples_df = samples_file %>%
 
 
 ```{r}
+# TODO make sure the path to the reference files is correct
 Check_point("Is the path to the reference files correct?")
+
 # Reference dbs
-#
-#
-#
-#
-#
-#
 ref_dir = "../reference_files"
 
 gtdb_tax = file.path(ref_dir, "gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna.gz")
@@ -130,16 +105,15 @@ gzip gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna
 
 # Check forward and reverse files
 ```{r}
-# List files in raw sequences dir
-forward_reads = samples_df$forward
-  
-reverse_reads = samples_df$reverse
-  
-# TODO make sure that the F and R read patterns are filled
+# TODO make sure the patterns are correct
 Check_point("If the correct file name pattern for Forward and Reverse reads added?")
 
 forward_pattern = "_R1_001.fastq.gz"
 reverse_pattern = "_R2_001.fastq.gz"
+
+# List files in raw sequences dir
+forward_reads = samples_df$forward
+reverse_reads = samples_df$reverse
 
 # Make sure the corresponding F and R files are present
 forward_names = forward_reads %>% 
