@@ -3,7 +3,7 @@
 Jacobo de la Cuesta-Zuluaga. December 2023.
 
 `Dieciseis` is the workflow for the analysis of 16S rRNA gene amplicons of
-the Maier lab. It implements the standard `dada` workflow described 
+the Maier lab. It implements the standard `DADA2` workflow described 
 [here](https://benjjneb.github.io/dada2/tutorial_1_8.html)
 
 ## Usage
@@ -20,7 +20,7 @@ abundances according to the taxonomic classification by species.
 ## Taxonomic classification files
 
 The present workflow uses the _SBDI Sativa curated 16S GTDB database_ available
-here [https://doi.org/10.17044/scilifelab.14869077]. This database is published
+[here](https://doi.org/10.17044/scilifelab.14869077). This database is published
 under the [CC by 4.0 license](https://creativecommons.org/licenses/by/4.0/), 
 which allows to copy, redistribute and transform the material. The complete database
 and custom databases derived from are found in the `reference_files` folder.
