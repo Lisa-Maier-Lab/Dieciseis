@@ -71,7 +71,7 @@ ref_dir = "../reference_files"
 # Load reference files
 # TODO make sure the corresponding taxonomy files are loaded
 # This is only valid if using a defined community (e.g. Com20, EED)
-SynthCom_species =  file.path(ref_dir, "COM20_GTDB_addSpecies.fna")
+SynthCom_species =  file.path(ref_dir, "COM20_GTDB_addSpecies.fna.gz")
 SynthCom_ref_taxonomy = read_tsv(file.path(ref_dir, "COM20_GTDB_Taxonomy.txt")) %>%
   mutate(GTDB_Taxonomy = str_remove_all(GTDB_Taxonomy, "[a-z]__")) %>%
   separate(GTDB_Taxonomy, 

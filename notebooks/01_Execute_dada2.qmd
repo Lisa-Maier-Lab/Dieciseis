@@ -12,9 +12,8 @@ from the cleaning of raw sequences, the identification of amplicon sequence vari
 (ASVs) and their general taxonomic classification.
 
 If you are processing sequences from a synthetic community such as Com20, you
-will need to run the second notebook `NAME OF NOTEBOOK` which covers a more specific
-taxonomic classification and the collapsing the abundance of ASVs according by
-species.
+will need to run the second notebook `02_Synth_Com_taxonomy` which covers a more 
+specific taxonomic classification and the collapsing the abundance of ASVs by species.
 
 For tutorials and explanations of the steps, see:
 https://benjjneb.github.io/dada2/tutorial_1_8.html 
@@ -51,6 +50,16 @@ source("../bin/Helper_functions.R")
 
 
 # Paths
+You need to make sure that the pathways to the directories with your sequence
+files, the references and the samples file are correct. 
+
+The present notebook is filled by default with the paths pointing to a few 
+test files used to make sure that the workflow runs correctly.
+
+*Note* that at several points throughout the notebook you will be prompted to
+respond whether the paths are correct so you can continue. For example, here
+you need to change the path saved in the `base_dir` variable.
+
 ```{r}
 # TODO make sure the directories are correct
 Check_point("Are the base and out directories filled?")
@@ -59,21 +68,7 @@ base_dir = "../test"
 
 # Output directory
 out_dir = file.path(base_dir, "dieciseis_out")
-
-# Filtered sequences
-filt_seqs_dir = tempdir()
 ```
-
-```{r}
-# TODO make sure the path to the samples file is correct
-Check_point("Is the path to the samples file correct?")
-
-samples_file =  file.path(base_dir, "test_samplesfile.tsv")
-
-samples_df = samples_file %>% 
-  read_tsv()
-```
-
 
 ```{r}
 # TODO make sure the path to the reference files is correct
@@ -90,11 +85,12 @@ gtdb_species = file.path(ref_dir, "gtdb-sbdi-sativa.r06rs202.addSpecies.fna.gz")
 fixed but it is here just as reference. You don't need to modify these files
 further.
 
-The files were originally obtained from:
-https://scilifelab.figshare.com/articles/dataset/SBDI_Sativa_curated_16S_GTDB_database/14869077 (June 2022).
+The files were originally obtained on June 2022 from:
+https://scilifelab.figshare.com/articles/dataset/SBDI_Sativa_curated_16S_GTDB_database/14869077
 
-They have a double domain entry because the authors of these files require them in such way for their pipeline.
-However, this leads to problems when used directly on dada2.
+They have a double domain entry because the authors of these files require them 
+in such way for their pipeline. However, this leads to problems when used 
+directly on dada2.
 
 To fix, I used the following commands:
 
@@ -102,8 +98,37 @@ To fix, I used the following commands:
 zcat gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fna.gz | sed -E 's~>Bacteria;|>Archaea;~>~' | sed '/>.*/s/$/;/' > gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna
 gzip gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna
 ```
+```{r}
+# Filtered sequences
+# In most cases you don't need to change this
+filt_seqs_dir = tempdir()
+```
+
+
+# Samples file
+You need to create a table with three columns, named `samplename`, `forward` and
+`reverse`. They should contain the name of the sample and their corresponding
+*forward* and *reverse* paths. Note that this should be the absolute (complete)
+path of the file.
+
+```{r}
+# TODO make sure the path to the samples file is correct
+Check_point("Is the path to the samples file correct?")
+
+samples_file =  file.path(base_dir, "test_samplesfile.tsv")
+
+samples_df = samples_file %>% 
+  read_tsv()
+```
 
 # Check forward and reverse files
+Here you might need to modify the pattern used by the sequencing center to
+label the forward and the reverse files. Check the names of your files and 
+adjust accordingly.
+
+You will then need to manually verify that for each file you have a forward
+and a reverse file.
+
 ```{r}
 # TODO make sure the patterns are correct
 Check_point("If the correct file name pattern for Forward and Reverse reads added?")
@@ -129,12 +154,12 @@ setdiff(forward_names, reverse_names)
 setdiff(reverse_names, forward_names)
 ```
 
-
 # Execute DADA2
 ## Check quality of data
 If you have a very large set of samples, you can select a fraction of them
-to perform the visual QC, otherwise it can take a long time. *Note* that this subset
-is not recommended.
+to perform the visual QC, otherwise it can take a long time. 
+
+*Note* that this subset is not recommended, change at yout own risk.
 
 ```{r}
 # Proportion of reads to randomly select
@@ -152,6 +177,11 @@ Raw_QC_plotsR = sample(reverse_reads, QC_subset_number) %>%
   map(., function(fastq) {plotQualityProfile(fastq)})
 ```
 
+
+The following two chunks will plot the resulting QC graphs. For an explanation
+of how to interpret these graphs, see the links to the tutorials at the top
+of this notebook.
+
 ```{r fig.height=3, fig.width=5}
 # Print forward plots
 Raw_QC_plotsF_hline = map(Raw_QC_plotsF, function(x) x + geom_hline(yintercept = 30))
@@ -166,6 +196,17 @@ Raw_QC_plotsR_hline
 
 
 # Filter reads
+The next step will perform the trimming of the reads based on sequence quality
+and lenght. In addition, it removes the primer sequences from the reads. This
+is based on the *NCCT* sequencing results. If you're using sequences produced 
+by the *NCCT* and are satisfied by the quality values obtained above, you don't 
+need to change the values here. 
+
+However, if using sequences from other centers or from public repositories,
+you will need to check whether they contain the primer sequences, the expected
+amplicon lenght and consider the quality of the reads.
+
+
 ```{r}
 # Filtering
 filtered_trimmed = filterAndTrim(fwd = forward_reads, 
@@ -183,6 +224,11 @@ filtered_trimmed = filterAndTrim(fwd = forward_reads,
 ```
 
 #  Learn errors
+
+To generate the ASVs, DADA2 uses the sequence error profiles, using the
+trimmed reads. As with the step dealing with raw sequence names above,
+you need to check that the names from the filtered read files make sense.
+
 ```{r}
 # List files in filtered sequences dir
 forward_filt_reads = list.files(filt_seqs_dir, pattern = forward_pattern, full.names = TRUE)
@@ -202,6 +248,9 @@ names(reverse_filt_reads) = reverse_names_filt
 
 
 ## Forward
+Now you can execute the `learnErrors` function for forward and reverse reads.
+You don't need to modify anything in the function call.
+
 ```{r}
 # Learn error rates
 set.seed(2112)
@@ -226,11 +275,21 @@ reverse_errors = learnErrors(forward_filt_reads,
                              verbose = TRUE)
 ```
 
+
+As with the QC plots, you need to interpret the error profile plots. It is
+your responsibility to make sure everything looks as expected. 
+
+For an explanation of this plot, please see the links to the tutorials above.
+
 ```{r}
 plotErrors(reverse_errors, nominalQ=TRUE)
 ```
 
 # Infer sequence variants
+
+Afterwards, you can proceed to the generation of the ASVs.
+You don't need to modify anything in the function call.
+
 ## Forward
 ```{r}
 forward_derep = map(forward_filt_reads, 
@@ -251,6 +310,8 @@ reverse_dada = map(reverse_derep,
 ```
 
 # Merge paired reads
+The denoised pairs of forward and reverse reads are merged if they are identical
+
 ```{r}
 merged_reads = mergePairs(forward_dada, 
                           forward_derep, 
@@ -261,12 +322,24 @@ merged_reads = mergePairs(forward_dada,
 
 
 # Construct sequence table
+Now the merged reads can be used to create a sequence table. 
+
+The size distribution of the generated ASVs is assessed. If the sequencing
+was performed by *NCCT* it is likely of the V4 region and the expected
+amplicon length is 250 base pairs. This should be reflected in the output of
+the following chunk, where most ASVs should have a length of ~250 base pairs
 ```{r}
 seq_table_raw = makeSequenceTable(merged_reads)
 dim(seq_table_raw)
 table(nchar(getSequences(seq_table_raw)))
 ```
 
+If the size distribution is correct, we can then restrict the final set of
+ASVs to the expected size rage. Therefore, values between 250 and 254 are
+reasonable.
+
+If you're running the workflow using *NCCT* sequencing, you most likely don't
+need to modify the values.
 ```{r}
 # Remove sequences with length above or below expected size
 Min_len = 250
@@ -282,6 +355,11 @@ table(nchar(getSequences(seq_table)))
 
 
 # Remove chimeras
+Next, chimeras are removed. Chimeras are sequencing errors that arise when
+two unrelated strands merge. The next chunk outputs the fraction of reads
+that are *not* chimeras, that is, good ASVs that can be used for downstream 
+analyses. In a normal sequencing run, this should be a very high value.
+
 ```{r}
 seq_table_dechimered <- removeBimeraDenovo(seq_table,
                                     method="consensus", 
@@ -293,11 +371,14 @@ seq_table_dechimered <- removeBimeraDenovo(seq_table,
 non_chimeras = round(sum(seq_table_dechimered)/sum(seq_table), 3)*100 
 
 # Print
-str_glue("The proportion of non-chimeric sequences was {nonchim}%",
+str_glue("The percentage of non-chimeric sequences was {nonchim}%",
          nonchim = non_chimeras)
 ```
 
 # Number of reads through the pipeline
+
+The following code generates a graph that illustrates how does the number of 
+sequences changes along the processing workflow for each sample.
 ```{r}
 getN = function(x) sum(getUniques(x))
 
@@ -330,6 +411,13 @@ Sequence_counts_workflow %>%
 
 
 # Assign taxonomy
+
+Once the clean ASVs are obtained, the taxonomic classification is assigned.
+This is a general classification, it is not specific to any microbial community
+in particular.
+
+The more exact classification performed for samples derived from synthetic
+communities is performed in a separate notebook.
 ```{r}
 merged_taxonomy = assignTaxonomy(seq_table_dechimered, 
                        gtdb_tax,
@@ -383,7 +471,14 @@ merged_taxonomy_sp %>%
 
 
 # Construct phylogeny
-From https://compbiocore.github.io/metagenomics-workshop/assets/DADA2_tutorial.html
+
+Certain downstream analyses require a phylogeny of the members of the microbial
+community, including Faith's phylogenetic diversity or the UniFrac family of
+distances.
+
+The following code was obtained from
+https://compbiocore.github.io/metagenomics-workshop/assets/DADA2_tutorial.html
+
 ```{r}
 # Retrieve sequences
 ASV_seqs = getSequences(seq_table_dechimered)
@@ -426,6 +521,11 @@ ASV_ML_tree %>%
 ```
 
 # Save files
+Finally, the tables with the ASV abundances and taxonomic classification are 
+generated and written. As with some of the steps above, you need to make sure
+that the correct output directories and file names are specified
+
+
 ## Create data frames
 ```{r}
 # Make sure sequence in column name corresponds to the taxonomy table
