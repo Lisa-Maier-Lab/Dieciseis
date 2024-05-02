@@ -193,6 +193,7 @@ SynthCom_taxonomy_collapse = SynthCom_df %>%
 # Long format df with abundance and tax of each species on each sample
 SynthCom_ASV_df = ASV_df %>% 
   pivot_longer(cols = -Sample, names_to = "ID", values_to = "Reads") %>% 
+  filter(ID %in% SynthCom_taxonomy_collapse$ID) %>% 
   left_join(SynthCom_taxonomy_collapse, by = join_by("ID"))
 
 # Add up abundances of each species on each sample
@@ -206,6 +207,30 @@ SynthCom_colapsed = SynthCom_ASV_df %>%
 SynthCom_colapsed %>% 
   head()
 ```
+
+# Proportion of reads from community
+```{r}
+# Total clear reads
+Total_reads = ASV_df %>% 
+  pivot_longer(-Sample) %>% 
+  group_by(Sample) %>% 
+  summarise(n_reads = sum(value))
+
+
+# Total reads from community
+Community_reads = SynthCom_colapsed %>% 
+  pivot_longer(-Sample) %>% 
+  group_by(Sample) %>% 
+  summarise(comm_reads = sum(value))
+
+# Join tables
+Prop_reads = left_join(Total_reads, Community_reads, by = join_by(Sample))
+
+# Calculate proportion
+Prop_reads %>% 
+  mutate(Same = (comm_reads/n_reads)*100)
+```
+
 # Write tables
 
 Finally, the tables with the collapsed species abundances and taxonomic 
