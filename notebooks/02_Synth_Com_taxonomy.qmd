@@ -8,9 +8,7 @@ format: html
 Jacobo de la Cuesta-Zuluaga. December 2023.
 
 This is the second notebook of the Maier Lab's 16S rRNA amplicon sequencing workflow.
-*Note* that is only needed if you are processing the sequences of a synthetic community
-such as EED or Com20. If you are processing complex samples, e.g. human feces, you
-don't need to run this notebook.
+*Note* that is only needed if you are processing the sequences of a synthetic community such as EED or Com20. If you are processing complex samples, e.g. human feces, you don't need to run this notebook.
 
 In the last notebook we processed the raw sequences, genertated ASVs and performed
 a general taxonomic classification. Here we will use full-length references to
@@ -46,7 +44,7 @@ conflict_prefer("setdiff", "base")
 The input files required to execute this notebook are the abundance and taxonomy
 tables of the detected ASVs that were generated using `DADA2` in the first notebook.
 
-Make sure to adapt the paths to the output directoy as needed.
+Make sure to adapt the paths to the output directory as needed.
 
 ```{r}
 Check_point("Are the base and out directories filled?")
@@ -70,7 +68,7 @@ merged_taxonomy_sp = file.path(out_dir, "Test_run_ASV_taxonomy.tsv") %>%
 
 *Importantly*,  the files with the full-length sequences of the 16S rRNA gene of
 the members of the synthetic community are required. Make sure you are loading
-the correct files, otherwise you will get an erroneous esimation of the abundance
+the correct files, otherwise you will get an erroneous estimation of the abundance
 of the species in your samples.
 
 ```{r}
@@ -81,8 +79,8 @@ ref_dir = "../reference_files"
 # Load reference files
 # TODO make sure the corresponding taxonomy files are loaded
 # This is only valid if using a defined community (e.g. Com20, EED)
-SynthCom_species =  file.path(ref_dir, "COM20_GTDB_addSpecies.fna.gz")
-SynthCom_ref_taxonomy = read_tsv(file.path(ref_dir, "COM20_GTDB_Taxonomy.txt")) %>%
+SynthCom_species =  file.path(ref_dir, "COM21_GTDB_addSpecies.fna.gz")
+SynthCom_ref_taxonomy = read_tsv(file.path(ref_dir, "COM21_GTDB_Taxonomy.txt")) %>%
   mutate(GTDB_Taxonomy = str_remove_all(GTDB_Taxonomy, "[a-z]__")) %>%
   separate(GTDB_Taxonomy, 
            into = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
@@ -115,20 +113,27 @@ combined_stringset = c(ASV_sequences, SynthCom_full) %>%
 
 # Align sequences
 combined_alignment = AlignSeqs(combined_stringset, verbose = FALSE)
+```
 
-# Calculate pairwise distances
-combined_distances = combined_alignment %>% 
+It is also good to visualize the alignment to check whether there's anything
+weird going on. In this case, it seems there are  a handful of ASVs that don't 
+quite align. However, in general, the other sequences aligned well.
+```{r fig.height=12, fig.width=18}
+combined_alignment %>% 
   as.DNAbin() %>% 
-  dist.dna(model = "raw")
+  image.DNAbin()
 ```
 
 
 Next, the distances between sequences are calculated. An ASV is assigned an
 exact taxonomy at the species level if its nucleotide sequence is at least
-98% similar to an entry in the database. Sequences that do not match any
+97% similar to an entry in the database. Sequences that do not match any
 microbe in the custom database are discarded.
 
 ```{r}
+# Calculate pairwise distances
+combined_distances = DistanceMatrix(combined_alignment)
+
 # Extract distance matrix
 # Long df 
 # Fix names
@@ -143,9 +148,9 @@ combined_distances_long = combined_distances %>%
   mutate(ASV_target = word(ASV_target, start = 2, end = -1)) %>% 
   arrange(ASV_query, Distance)
 
-# Filter to matches with 98 or higher identity
+# Filter to matches with 97 or higher identity
 SynthCom_df_raw = combined_distances_long %>% 
-  filter(Distance <= 0.02) %>% 
+  filter(Distance <= 0.03) %>% 
   group_by(ASV_query) %>% 
   slice(1) %>% 
   ungroup()
@@ -163,13 +168,9 @@ SynthCom_df
 ```
 
 At this point it is possible to have multiple ASVs with the same taxonomic
-classification, for example, `ASV0001` and `ASV0003` could both belong to
-Clostridium perfringens. This is normal and expected. This can happen due to
-errors during sequencing that introduce changes in the sequence of the ASV.
-Likewise, recall that microbes can have multiple copies of the 16S rRNA gene
-which are not identical and each ASV could represent a different copy. Finally,
-it could be due to limits in the method's ability to identify different sequences
-as member of a same ASV.
+classification, for example, `ASV0001` and `ASV0004` both belong to Clostridium perfringens. This is normal and expected. This can happen due to errors during sequencing that introduce changes in the sequence of the ASV. Likewise, microbes 
+can have multiple copies of the 16S rRNA gene which are not identical and each
+ASV could represent a different copy. Finally, it could be due to limits in the method's ability to identify different sequences as member of a same ASV.
 
 In any case, this will be addressed in the next step.
 
@@ -179,9 +180,10 @@ Since synthetic communities are constructed from pure bacterial cultures (at
 least in theory), it is reasonable to assume that all ASVs with the exact same
 taxonomic assignment belong to the same species and can be grouped together.
 The following step adds up the abundances of all ASVs with the same taxonomic
-label within a given sample. Continuing with the example above, if Sample_1
-has 7 counts of ASV0001 and 3 of ASV0007, both labeled Clostridium perfringens,
-then in the output table, Sample_1 will have a total of 10 counts of C. perfringens
+label within a given sample. Continuing with the example above, if `Sample_1`
+has 7 counts of `ASV0001` and 3 of `ASV0004`, both labeled Clostridium 
+perfringens, then in the output table, Sample_1 will have a total of 10 counts
+of C. perfringens
 
 ```{r}
 # Taxonomy of each ASV from the synthetic community
@@ -209,6 +211,12 @@ SynthCom_colapsed %>%
 ```
 
 # Proportion of reads from community
+
+It is always good to check how many reads are mapping to actual members of the
+synthetic community. We expect a very high proportion of reads mapping to the
+expected species in the sample. If you get many reads that don't map to the species
+you know are in your community, it might be a sign that something went wrong at
+some point.
 ```{r}
 # Total clear reads
 Total_reads = ASV_df %>% 

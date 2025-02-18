@@ -1,6 +1,7 @@
-Sample	Agathobacter rectalis	Bacteroides fragilis	Bacteroides thetaiotaomicron	Bacteroides uniformis	Bariatricus comes	Clostridium_P perfringens	Collinsella aerofaciens	Dorea formicigenerans	Eggerthella lenta	Enterocloster bolteae	Erysipelatoclostridium ramosum	Fusobacterium nucleatum	Lacrimispora saccharolytica	Parabacteroides merdae	Phocaeicola vulgatus	Roseburia intestinalis	Ruminococcus_B gnavus	Streptococcus parasanguinis	Streptococcus salivarius	Veillonella parvula
-2108-lm-d1-001_S1	391	4995	2430	1547	2298	15046	7	676	2263	120	4024	1692	229	1723	2092	672	1143	149	783	1201
-2108-lm-d1-009_S9	236	4417	2176	749	1108	17473	0	392	60	371	1316	1042	296	931	722	655	1211	98	299	358
-2108-lm-d1-017_S17	303	6392	3502	1359	1677	19904	0	279	449	352	1556	2706	648	2264	1355	1177	835	145	327	1040
-2108-lm-d1-021_S21	156	3010	2441	2751	1452	25910	267	123	304	249	1102	2441	259	3181	2924	713	878	75	416	1116
-2108-lm-d1-028_S28	178	3626	2374	1048	1209	14436	5	161	895	428	1357	1523	241	1875	1672	654	426	79	288	628
+Sample	Agathobacter rectalis	Bacteroides fragilis	Bacteroides thetaiotaomicron	Bacteroides uniformis	Bariatricus comes	Clostridium_P perfringens	Collinsella aerofaciens	Dorea formicigenerans	Eggerthella lenta	Enterocloster bolteae	Erysipelatoclostridium ramosum	Escherichia coli	Fusobacterium nucleatum	Lacrimispora saccharolytica	Parabacteroides merdae	Phocaeicola vulgatus	Roseburia intestinalis	Ruminococcus_B gnavus	Streptococcus parasanguinis	Streptococcus salivarius	Veillonella parvula
+Plate-PMA-Well-D11-DMSO0R3LM0087INV	482	7101	13714	3550	1417	42708	482	441	250	1205	205	16743	61	715	696	378	660	162	133	45	134
+Plate-PMA-Well-D3-DMSO0R1LM0087INV	471	5655	16245	3529	1657	39529	580	503	384	1193	166	16892	322	670	966	198	585	342	78	0	336
+Plate-PMA-Well-D7-DMSO0R2LM0087INV	389	3481	11414	3001	6219	37608	731	2317	2430	386	812	13819	229	201	919	1387	581	218	288	53	317
+Plate-PMA-Well-H12-DMSO0R3LM0087INV	305	3087	7137	1683	2906	25909	414	2006	683	266	498	8854	11	104	386	775	464	86	96	91	73
+Plate-PMA-Well-H4-DMSO0R1LM0087INV	300	2881	9936	2062	5177	25017	475	1613	1328	316	572	9895	237	174	1174	787	438	130	116	31	250
+Plate-PMA-Well-H8-DMSO0R2LM0087INV	196	1853	8702	1844	3689	20402	365	1207	780	288	451	9160	219	149	681	610	345	105	138	21	217

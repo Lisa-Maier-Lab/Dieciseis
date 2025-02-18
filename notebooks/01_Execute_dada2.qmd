@@ -5,7 +5,7 @@ format: html
 
 # Aim
 
-Jacobo de la Cuesta-Zuluaga. December 2023.
+Jacobo de la Cuesta-Zuluaga. February 2025.
 
 This notebook illustrates how to process raw 16S rRNA gene amplicons using `DADA2`,
 from the cleaning of raw sequences, the identification of amplicon sequence variants
@@ -18,6 +18,32 @@ specific taxonomic classification and the collapsing the abundance of ASVs by sp
 For tutorials and explanations of the steps, see:
 https://benjjneb.github.io/dada2/tutorial_1_8.html 
 https://alexiscarter.github.io/metab/Dada_script_EN.html
+
+# Notes and updates
+
+## Februrary 2025
+
+In this updated version of the notebook, I have made changes to reflect our change
+of sequencing provider. The lab is now using the services of a sequencing facility
+that uses the V3-V4 region of the 16S rRNA gene, and a newer sequencing platform
+that changes the way the error profiles are stored in the `fastq` files. This
+so-called "binned" error profiles alter the way `DADA2` deals with the sequences
+and thus require some adjustments on the code.
+
+I have added a few steps where you, the user, need to specify what kind of 
+sequences are using, that is, the new binned errors or the older linear errors. 
+This way, the notebook will be usable regardless of the sequencing you have. 
+*Note* that if you have reads using two different profiles, you will need to
+process them separately!
+
+Other changes: 
+
+* I added a filtering step to remove ASVs that have no classification at the 
+phylum level, you can find an explanation below.
+
+* I moved the generation of the ASV phylogeny to an optional section at the end
+of the notebook.
+
 
 # Libraries
 
@@ -36,7 +62,7 @@ library(conflicted)
 
 
 ```{r}
-# Solve conflics with certain function names
+# Solve conflicts with certain function names
 conflict_prefer("filter", "dplyr")
 conflict_prefer("slice", "dplyr")
 conflict_prefer("rename", "dplyr")
@@ -104,6 +130,25 @@ gzip gtdb-sbdi-sativa.r06rs202.assignTaxonomy.fixed.fna
 filt_seqs_dir = tempdir()
 ```
 
+# Sequencing facility
+
+This notebook includes two sets of test files:
+
+1. Samples from the V4 region of the 16S rRNA gene sequenced with Illumina MiSeq
+using linear error profiles. This is the kind of samples obtained from `NCCT`
+
+2. Samples corresponding to the V3-V4 region of the 16S rRNA gene sequenced
+with Illumina MiSeq using binned error profiles. This is the kind of samples
+obtained from `GeneWiz`
+
+Here, you need to select what kind of samples you have
+```{r}
+# TODO Sequencing facility
+Check_point("Did you select the appropriate sequencing facility?")
+
+# options: NCCT or GeneWiz
+sequencing_facility = "GeneWiz" 
+```
 
 # Samples file
 You need to create a table with three columns, named `samplename`, `forward` and
@@ -112,10 +157,16 @@ You need to create a table with three columns, named `samplename`, `forward` and
 path of the file.
 
 ```{r}
+if(sequencing_facility == "NCCT"){
+  warning("you selected NCCT as seq facility. Use the test_samplesfile.tsv in the example")
+} else if(sequencing_facility == "GeneWiz") {
+  warning("you selected GeneWiz as seq facility. Use the novaseq_samplesfile.tsv in the example")
+}
+
 # TODO make sure the path to the samples file is correct
 Check_point("Is the path to the samples file correct?")
 
-samples_file =  file.path(base_dir, "test_samplesfile.tsv")
+samples_file =  file.path(base_dir, "novaseq_samplesfile.tsv")
 
 samples_df = samples_file %>% 
   read_tsv()
@@ -159,7 +210,7 @@ setdiff(reverse_names, forward_names)
 If you have a very large set of samples, you can select a fraction of them
 to perform the visual QC, otherwise it can take a long time. 
 
-*Note* that this subset is not recommended, change at yout own risk.
+*Note* that this subset is not recommended, change at your own risk.
 
 ```{r}
 # Proportion of reads to randomly select
@@ -177,34 +228,57 @@ Raw_QC_plotsR = sample(reverse_reads, QC_subset_number) %>%
   map(., function(fastq) {plotQualityProfile(fastq)})
 ```
 
-
 The following two chunks will plot the resulting QC graphs. For an explanation
 of how to interpret these graphs, see the links to the tutorials at the top
 of this notebook.
 
 ```{r fig.height=3, fig.width=5}
 # Print forward plots
-Raw_QC_plotsF_hline = map(Raw_QC_plotsF, function(x) x + geom_hline(yintercept = 30))
+Raw_QC_plotsF_hline = map(Raw_QC_plotsF, function(x) x + 
+                            geom_hline(yintercept = 30) + 
+                            geom_vline(xintercept = 245))
 Raw_QC_plotsF_hline
 ```
 
 ```{r fig.height=3, fig.width=5}
 # Print Rreverse plots
-Raw_QC_plotsR_hline = map(Raw_QC_plotsR, function(x) x + geom_hline(yintercept = 30))
+Raw_QC_plotsR_hline = map(Raw_QC_plotsR, function(x) x + 
+                            geom_hline(yintercept = 30) +
+                            geom_vline(xintercept = 245))
 Raw_QC_plotsR_hline
 ```
 
 
 # Filter reads
 The next step will perform the trimming of the reads based on sequence quality
-and lenght. In addition, it removes the primer sequences from the reads. This
-is based on the *NCCT* sequencing results. If you're using sequences produced 
-by the *NCCT* and are satisfied by the quality values obtained above, you don't 
+and length. In addition, it removes the primer sequences from the reads. This
+is based on *GeneWiz* sequencing results. If you're using sequences produced 
+by *GeneWiz* and are satisfied by the quality values obtained above, you don't 
 need to change the values here. 
 
-However, if using sequences from other centers or from public repositories,
-you will need to check whether they contain the primer sequences, the expected
-amplicon lenght and consider the quality of the reads.
+The sequences obtained from *NCCT* use a sequencing chemistry in which the 
+quality of the sequences decreases more towards the ends of the read. 
+You will see a dip of the green line below 30 on the right side of the graph.
+In that case, change the following parameter to something similar 
+to `truncLen=c(225, 200)`.You can play with the value of the parameter 
+`geom_vline(xintercept = 245)` in the chunks above to select an adequate value.
+
+If using sequences from other centers or from public repositories, you will need
+to check whether they contain the primer sequences, the expected amplicon length
+and consider the quality of the reads.
+
+```{r}
+# Trim sequences based on sequencing facility
+# This is selected based on the facility you specified above
+
+if(sequencing_facility == "NCCT"){
+  trim_left = c(23,24)
+} else if(sequencing_facility == "GeneWiz") {
+  trim_left = c(16,21)
+} else {
+  warning("Please select the sequencing facility")
+}
+```
 
 
 ```{r}
@@ -213,14 +287,15 @@ filtered_trimmed = filterAndTrim(fwd = forward_reads,
               rev = reverse_reads, 
               filt = filt_seqs_dir, 
               filt.rev = filt_seqs_dir,
-              trimLeft = c(23,24), # Trim nucleotides corresponding to primer sequences. To check align primers to raw seqs
-              truncLen=c(225, 200), # Truncation position of F and R
-              maxEE=c(2,2), # Number of expected errors
-              truncQ=11, # Truncate reads at the first instance of a quality score less than
-              rm.phix=TRUE, # filter matches against the phiX
-              compress=TRUE, 
-              verbose=TRUE, 
-              multithread=FALSE)
+              trimLeft = trim_left, # Trim nucleotides corresponding to primers. To check align primers to raw seqs
+              truncLen = c(240, 240), # Truncation position of F and R. Change if needed!
+              maxEE = c(2,2), # Number of expected errors
+              truncQ = 10, # Truncate reads at the first instance of a quality score less than
+              rm.phix = TRUE, # filter matches against the phiX
+              compress = TRUE, 
+              verbose = TRUE, 
+              multithread = FALSE,
+              matchIDs = TRUE)
 ```
 
 #  Learn errors
@@ -246,20 +321,57 @@ names(forward_filt_reads) = forward_names_filt
 names(reverse_filt_reads) = reverse_names_filt
 ```
 
+## Error profile function
+
+First, you need to determine whether your error profile is binned or linear.
+Raw sequencing files give an error value to each base, called a phred score, that
+can go from 0 to 40 (using various symbols). A binned error profile groups values
+into ranges.
+
+Long story short, if you execute the following function and get something like
+`2 11 25 37` it means that your errors are binned.
+
+If you have samples showing something different, you will need to process them
+separately.
+```{r}
+QualityBinValue(forward_reads, reverse_reads)
+```
+
+
+```{r}
+# Type of error profile
+# Linear error profile can be found in samples sequenced by NCCT
+# Binned error profile is found in GeneWiz sequenced samples
+# This is selected based on the facility you specified above
+
+if(sequencing_facility == "NCCT"){
+  error_function = loessErrfun
+} else if(sequencing_facility == "GeneWiz") {
+  binnedQs = c(2, 11, 25, 37) # Change if you have different values from the chunk above
+  error_function = makeBinnedQualErrfun(binnedQs)
+} else {
+  warning("Please select the sequencing facility")
+}
+```
 
 ## Forward
+
 Now you can execute the `learnErrors` function for forward and reverse reads.
 You don't need to modify anything in the function call.
 
 ```{r}
-# Learn error rates
+# Set random seed
 set.seed(2112)
-forward_errors = learnErrors(forward_filt_reads, 
-                             nbases = 1e8, 
-                             randomize=TRUE,
-                             multithread=FALSE, 
-                             verbose = TRUE)
+```
 
+```{r}
+# Learn error rates
+forward_errors = learnErrors(forward_filt_reads, 
+                             nbases = 2e8, 
+                             randomize = TRUE,
+                             multithread = FALSE, 
+                             verbose = TRUE, 
+                             errorEstimationFunction = error_function)
 ```
 
 ```{r}
@@ -269,21 +381,30 @@ plotErrors(forward_errors, nominalQ=TRUE)
 ## Reverse
 ```{r}
 reverse_errors = learnErrors(forward_filt_reads, 
-                             nbases = 1e8, 
-                             randomize=TRUE,
-                             multithread=FALSE, 
-                             verbose = TRUE)
+                             nbases = 2e8, 
+                             randomize = TRUE,
+                             multithread = FALSE, 
+                             verbose = TRUE,
+                             errorEstimationFunction = error_function)
 ```
 
 
+```{r}
+plotErrors(reverse_errors, nominalQ = TRUE)
+```
 As with the QC plots, you need to interpret the error profile plots. It is
 your responsibility to make sure everything looks as expected. 
 
 For an explanation of this plot, please see the links to the tutorials above.
 
-```{r}
-plotErrors(reverse_errors, nominalQ=TRUE)
-```
+*Note* that the plot from the binned errors look different from that of linear
+errors. For an explanation of the plot, see:
+https://github.com/benjjneb/dada2/issues/1307#issuecomment-2521790524
+
+In brief, the observed error rates per average Q score are scaled by the number 
+of reads supporting them. That's why the largest circles are at 11, 25 and 37 in the
+x axis
+
 
 # Infer sequence variants
 
@@ -296,7 +417,8 @@ forward_derep = map(forward_filt_reads,
                     function(filt_fq){derepFastq(filt_fq, verbose = TRUE)})
 
 forward_dada = map(forward_derep, 
-                   function(derep_obj){dada(derep_obj, err=forward_errors, multithread=FALSE, verbose = TRUE)})
+                   function(derep_obj){dada(derep_obj, err = forward_errors,
+                                            multithread = FALSE, verbose = TRUE)})
 ```
 
 ## Reverse
@@ -305,7 +427,8 @@ reverse_derep = map(reverse_filt_reads,
                     function(filt_fq){derepFastq(filt_fq, verbose = TRUE)})
 
 reverse_dada = map(reverse_derep, 
-                   function(derep_obj){dada(derep_obj, err=reverse_errors, multithread=FALSE, verbose = TRUE)})
+                   function(derep_obj){dada(derep_obj, err = reverse_errors, 
+                                            multithread = FALSE, verbose = TRUE)})
 
 ```
 
@@ -317,17 +440,24 @@ merged_reads = mergePairs(forward_dada,
                           forward_derep, 
                           reverse_dada, 
                           reverse_derep, 
-                          verbose=TRUE)
+                          verbose = TRUE)
 ```
 
 
 # Construct sequence table
-Now the merged reads can be used to create a sequence table. 
+Now the merged reads can be used to create a sequence table.  The size distribution
+of the generated ASVs is assessed. 
 
-The size distribution of the generated ASVs is assessed. If the sequencing
-was performed by *NCCT* it is likely of the V4 region and the expected
-amplicon length is 250 base pairs. This should be reflected in the output of
-the following chunk, where most ASVs should have a length of ~250 base pairs
+If the sequencing was performed by *NCCT* it is likely of the V4 region and the
+expected amplicon length is 250 base pairs. This should be reflected in the 
+output of the following chunk, where most ASVs should have a length of ~250 bp.
+
+If the sequencing was performed by *GeneWiz*, it is likely the V3-V4 regions were
+sequenced, which result in a longer length because the overlap between the reads
+is lower. The ASVs should have a length between ~390 and ~430 bp, with a bimodal
+distribution, that is, high numbers around 400 and around 420.
+
+
 ```{r}
 seq_table_raw = makeSequenceTable(merged_reads)
 dim(seq_table_raw)
@@ -335,15 +465,16 @@ table(nchar(getSequences(seq_table_raw)))
 ```
 
 If the size distribution is correct, we can then restrict the final set of
-ASVs to the expected size rage. Therefore, values between 250 and 254 are
+ASVs to the expected size rage. Therefore, values between 393 and 426 are
 reasonable.
 
-If you're running the workflow using *NCCT* sequencing, you most likely don't
+If you're running the workflow using *GeneWiz* sequencing, you most likely don't
 need to modify the values.
+
 ```{r}
 # Remove sequences with length above or below expected size
-Min_len = 250
-Max_len = 254
+Min_len = 393
+Max_len = 426
 
 # TODO Check that the size range makes sense
 Check_point("Was the amplicon size range adjusted accordingly?")
@@ -355,16 +486,23 @@ table(nchar(getSequences(seq_table)))
 
 
 # Remove chimeras
-Next, chimeras are removed. Chimeras are sequencing errors that arise when
-two unrelated strands merge. The next chunk outputs the fraction of reads
-that are *not* chimeras, that is, good ASVs that can be used for downstream 
-analyses. In a normal sequencing run, this should be a very high value.
+
+Next, chimeras are removed. Chimeras are sequencing errors that arise when two 
+unrelated strands merge. The next chunk outputs the fraction of reads that are 
+*not* chimeras, that is, good ASVs that can be used for downstream analyses. 
+
+In a normal sequencing run from *NCCT*, this should >90%.
+
+In a run from *GeneWiz* the number of non-chimeric sequences expected is ~80%.
+Chimera rates tend to be higher in multi-V-region because the conserved region
+in the middle makes it easier for partial amplicons to re-anneal to others 
+during PCR.
 
 ```{r}
-seq_table_dechimered <- removeBimeraDenovo(seq_table,
-                                    method="consensus", 
-                                    multithread=FALSE, 
-                                    verbose=TRUE)
+seq_table_dechimered = removeBimeraDenovo(seq_table,
+                                          method = "consensus", 
+                                          multithread = FALSE, 
+                                          verbose = TRUE)
 
 # Proportion of non-chimeras
 
@@ -421,13 +559,13 @@ communities is performed in a separate notebook.
 ```{r}
 merged_taxonomy = assignTaxonomy(seq_table_dechimered, 
                        gtdb_tax,
-                       minBoot=70,
+                       minBoot = 70,
                        tryRC = TRUE,
-                       multithread=FALSE)
+                       multithread = FALSE)
 
 merged_taxonomy_sp_raw = addSpecies(merged_taxonomy, 
                                     gtdb_species, 
-                                    verbose=TRUE)
+                                    verbose = TRUE)
 ```
 
 ```{r}
@@ -469,8 +607,87 @@ merged_taxonomy_sp %>%
   head()
 ```
 
+## Remove unclassified sequences
 
-# Construct phylogeny
+Finally, poorly classified ASVs are removed from the final table.
+Such ASVs are usually the result of sequencing errors or, in the case of 
+host-associated samples, these can originate from mitochondria or chloroplasts
+from the host or its diet.
+
+If you get a high proportion of poorly classified ASVs, this could be a sign that
+something went wrong in the sequencing run.
+
+In this case, sequences that don't have a phylum-level classifications will be
+removed.
+
+```{r}
+# Identify poorly classified ASVs
+Unclassified_ASVs = merged_taxonomy_sp %>% 
+  filter(is.na(Phylum))
+
+# Explore unclassified ASVs
+Unclassified_ASVs 
+```
+
+
+```{r}
+# Filter taxonomy table
+merged_taxonomy_filt = merged_taxonomy_sp %>% 
+  filter(!is.na(Phylum))
+```
+
+# Save files
+Finally, the tables with the ASV abundances and taxonomic classification are 
+generated and written. As with some of the steps above, you need to make sure
+that the correct output directories and file names are specified
+
+
+## Create data frames
+```{r}
+# Make sure sequence in column name corresponds to the taxonomy table
+colnames(seq_table_dechimered) == merged_taxonomy_sp$Seq
+
+# Create ASV table
+# Replace names for ASV ID. Can also be changed to the md5
+ASV_df_unfilt = seq_table_dechimered %>% 
+  as.data.frame() %>% 
+  rownames_to_column("Sample") 
+
+colnames(ASV_df_unfilt) = c("Sample", merged_taxonomy_sp$ID)
+
+ASV_df = ASV_df_unfilt %>% 
+  select(Sample, all_of(merged_taxonomy_filt$ID))
+
+# Print
+ASV_df %>% 
+  head
+```
+
+## Write tables and tree to file
+```{r}
+# TODO Change the file names if needed
+Check_point("Are the file names adjusted?")
+
+# Give a name to your files
+file_prefix = "Test_run"
+
+out_asv_file = paste(file_prefix, "ASV_table.tsv", sep = "_") %>%
+  file.path(out_dir, .)
+
+out_tax_file = paste(file_prefix, "ASV_taxonomy.tsv", sep = "_") %>%
+  file.path(out_dir, .)
+
+write_tsv(ASV_df, out_asv_file)
+write_tsv(merged_taxonomy_filt, out_tax_file)
+
+# Optional
+# Save workspace
+# paste(file_prefix, "16S.RData.tsv", sep = "_") %>%
+#   file.path(out_dir, .) %>%
+#   save.image(.)
+```
+
+# (Optional) Construct phylogeny
 
 Certain downstream analyses require a phylogeny of the members of the microbial
 community, including Faith's phylogenetic diversity or the UniFrac family of
@@ -503,11 +720,11 @@ ASV_NJ_tree = phangorn::NJ(ASV_dist) # Note, tip order != sequence order
 ASV_ML_fit = phangorn::pml(ASV_NJ_tree, data = ASV_align_matrix)
 
 # negative edges length changed to 0!
-ASV_ML_mod = update(ASV_ML_fit, k=4, inv=0.2)
+ASV_ML_mod = update(ASV_ML_fit, k = 4, inv = 0.2)
 ASV_ML_mod = phangorn::optim.pml(ASV_ML_mod, 
-                         model="GTR", 
-                         optInv=TRUE, 
-                         optGamma=TRUE,
+                         model = "GTR", 
+                         optInv = TRUE, 
+                         optGamma = TRUE,
                          rearrangement = "stochastic", 
                          control = phangorn::pml.control(trace = 0))
 ```
@@ -520,55 +737,11 @@ ASV_ML_tree %>%
   class
 ```
 
-# Save files
-Finally, the tables with the ASV abundances and taxonomic classification are 
-generated and written. As with some of the steps above, you need to make sure
-that the correct output directories and file names are specified
-
-
-## Create data frames
 ```{r}
-# Make sure sequence in column name corresponds to the taxonomy table
-colnames(seq_table_dechimered) == merged_taxonomy_sp$Seq
-
-# Create ASV table
-# Replace names for ASV ID. Can also be changed to the md5
-ASV_df = seq_table_dechimered %>% 
-  as.data.frame() %>% 
-  rownames_to_column("Sample")
-
-colnames(ASV_df) = c("Sample", merged_taxonomy_sp$ID)
-
-# Print
-ASV_df %>% 
-  head
-```
-
-## Write tables and tree to file
-```{r}
-# TODO Change the file names if needed
-Check_point("Are the file names adjusted?")
-
-# Give a name to your files
-file_prefix = "Test_run"
-
-out_asv_file = paste(file_prefix, "ASV_table.tsv", sep = "_") %>% 
+# Write tree file
+out_tree_file = paste(file_prefix, "ASV_tree.tre", sep = "_") %>%
   file.path(out_dir, .)
 
-out_tax_file = paste(file_prefix, "ASV_taxonomy.tsv", sep = "_") %>% 
-  file.path(out_dir, .)
-
-out_tree_file = paste(file_prefix, "ASV_tree.tre", sep = "_") %>% 
-  file.path(out_dir, .)
-
-write_tsv(ASV_df, out_asv_file)
-write_tsv(merged_taxonomy_sp, out_tax_file)
 ape::write.tree(ASV_ML_tree, file = out_tree_file)
-
-# Optional
-# Save workspace
-# paste(file_prefix, "16S.RData.tsv", sep = "_") %>% 
-#   file.path(out_dir, .) %>% 
-#   save.image(.)
 ```
 

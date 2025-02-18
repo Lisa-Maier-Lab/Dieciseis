@@ -2,7 +2,7 @@
 library(tidyverse)
 
 # Files directory
-Files_dir = "/mnt/volume_main_2/dm_main/projects/Dieciseis/test/seqs"
+Files_dir = "/mnt/volume_1/dm_main/projects/Dieciseis/test/novaseqs/"
 
 # List fastq files
 Files = Files_dir %>% 
@@ -23,4 +23,4 @@ Example_df = data.frame(forward = F_files, reverse = R_files) %>%
 
 # Write
 Example_df %>% 
-  write_tsv("/mnt/volume_main_2/dm_main/projects/Dieciseis/test/test_samplesfile.tsv")
+  write_tsv("/mnt/volume_main_2/dm_main/projects/Dieciseis/test/novaseq_samplesfile.tsv")
