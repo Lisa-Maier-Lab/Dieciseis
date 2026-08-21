@@ -380,7 +380,7 @@ plotErrors(forward_errors, nominalQ=TRUE)
 
 ## Reverse
 ```{r}
-reverse_errors = learnErrors(forward_filt_reads, 
+reverse_errors = learnErrors(reverse_filt_reads, 
                              nbases = 2e8, 
                              randomize = TRUE,
                              multithread = FALSE, 
@@ -392,6 +392,7 @@ reverse_errors = learnErrors(forward_filt_reads,
 ```{r}
 plotErrors(reverse_errors, nominalQ = TRUE)
 ```
+
 As with the QC plots, you need to interpret the error profile plots. It is
 your responsibility to make sure everything looks as expected. 
 
