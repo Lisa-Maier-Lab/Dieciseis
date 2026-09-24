@@ -2,25 +2,25 @@
 library(tidyverse)
 
 # Files directory
-Files_dir = "/mnt/volume_1/dm_main/projects/Dieciseis/test/novaseqs/"
+Files_dir = "/PATH/TO/Dieciseis/test/seqs/"
 
 # List fastq files
-Files = Files_dir %>% 
-  list.files(full.names = TRUE, pattern = "fastq")
+Files = Files_dir |> 
+  list.files(full.names = FALSE, pattern = "fastq")
 
 # Separate F and R
-F_files = Files %>% 
-  str_subset("R1")
+F_files = Files |> 
+  str_subset("R1_001")
 
-R_files = Files %>% 
-  str_subset("R2")
+R_files = Files |> 
+  str_subset("R2_001")
 
 # Create df
-Example_df = data.frame(forward = F_files, reverse = R_files) %>% 
+Example_df = data.frame(forward = F_files, reverse = R_files) |> 
   mutate(samplename = basename(forward),
-         samplename = str_remove(samplename, "_R1.*")) %>% 
+         samplename = str_remove(samplename, "_R1.*")) |> 
   relocate(samplename)
 
 # Write
-Example_df %>% 
-  write_tsv("/mnt/volume_main_2/dm_main/projects/Dieciseis/test/novaseq_samplesfile.tsv")
+Example_df |> 
+  write_tsv("/mnt/ceph_1/dm_main/projects/Dieciseis/test/test_samplesfile.tsv")
