@@ -37,10 +37,10 @@ library(conflicted)
 
 ```{r}
 # Solve conflicts with certain function names
-conflict_prefer("filter", "dplyr")
-conflict_prefer("slice", "dplyr")
-conflict_prefer("rename", "dplyr")
-conflict_prefer("setdiff", "base")
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::slice)
+conflicts_prefer(dplyr::rename)
+conflicts_prefer(base::setdiff)
 ```
 
 # Paths
@@ -62,7 +62,6 @@ you need to change the path saved in the `base_dir` variable.
 # Base directory
 # This should be the path to the dieciseis repo
 base_dir = ""
-base_dir <- "/mnt/ceph_1/dm_main/projects/Dieciseis"
 stopifnot(base_dir != "")
 ```
 
@@ -250,9 +249,8 @@ binnedQs = c(2, 11, 25, 37)
 
 ```{r}
 # Type of error profile
-# Linear error profile can be found in samples sequenced by NCCT
-# Binned error profile is found in GeneWiz sequenced samples
-# This is selected based on the facility you specified above
+# Linear error profile can be found in old samples sequenced by NCCT
+# Binned error profile is found in GeneWiz and new NCCT sequenced samples
 
 if (error_profile_type == "linear") {
   error_function <- loessErrfun
@@ -340,7 +338,7 @@ and consider the quality of the reads.
 # this depends on the protocol and the sequencing facility
 # In general, it can be either `V3-V4` (e.g. from GeneWiz) or
 # `V4` (e.g. from NCCT)
-V_region = ""
+V_region = "V3-V4"
 
 Check_point(
   "Did you check which hypervariable region are you sequencing?"
@@ -370,7 +368,7 @@ filtered_trimmed <- filterAndTrim(
   rm.phix = TRUE, # filter matches against the phiX
   compress = TRUE,
   verbose = TRUE,
-  multithread = FALSE,
+  multithread = 8,
   matchIDs = TRUE
 )
 ```
@@ -422,7 +420,7 @@ forward_errors <- learnErrors(
   forward_filt_reads,
   nbases = 2e8,
   randomize = TRUE,
-  multithread = FALSE,
+  multithread = 8,
   verbose = TRUE,
   errorEstimationFunction = error_function
 )
@@ -438,7 +436,7 @@ reverse_errors <- learnErrors(
   reverse_filt_reads,
   nbases = 2e8,
   randomize = TRUE,
-  multithread = FALSE,
+  multithread = 8,
   verbose = TRUE,
   errorEstimationFunction = error_function
 )
@@ -475,7 +473,7 @@ forward_derep <- map(forward_filt_reads, function(filt_fq) {
 })
 
 forward_dada <- map(forward_derep, function(derep_obj) {
-  dada(derep_obj, err = forward_errors, multithread = FALSE, verbose = TRUE)
+  dada(derep_obj, err = forward_errors, multithread = 8, verbose = TRUE)
 })
 ```
 
@@ -486,7 +484,7 @@ reverse_derep <- map(reverse_filt_reads, function(filt_fq) {
 })
 
 reverse_dada <- map(reverse_derep, function(derep_obj) {
-  dada(derep_obj, err = reverse_errors, multithread = FALSE, verbose = TRUE)
+  dada(derep_obj, err = reverse_errors, multithread = 8, verbose = TRUE)
 })
 ```
 
@@ -528,7 +526,7 @@ If the size distribution is correct, we can then restrict the final set of
 ASVs to the expected size rage. Therefore, values between 393 and 426 are
 reasonable.
 
-If you're running the workflow using *GeneWiz* sequencing, you most likely don't
+If you're running the workflow using *V3-V4* sequencing, you most likely don't
 need to modify the values.
 
 ```{r}
@@ -553,18 +551,18 @@ Next, chimeras are removed. Chimeras are sequencing errors that arise when two
 unrelated strands merge. The next chunk outputs the fraction of reads that are 
 *not* chimeras, that is, good ASVs that can be used for downstream analyses. 
 
-In a normal sequencing run from *NCCT*, this should >90%.
+In a normal sequencing run using the *V4* region, this should >90%.
 
-In a run from *GeneWiz* the number of non-chimeric sequences expected is ~80%.
-Chimera rates tend to be higher in multi-V-region because the conserved region
-in the middle makes it easier for partial amplicons to re-anneal to others 
-during PCR.
+In a run of the *V3-V4* region, the number of non-chimeric sequences expected 
+is ~80%. Chimera rates tend to be higher in multi-V-region amplicons because the
+conserved region in the middle makes it easier for partial amplicons to re-anneal
+to others during PCR.
 
 ```{r}
 seq_table_dechimered <- removeBimeraDenovo(
   seq_table,
   method = "consensus",
-  multithread = FALSE,
+  multithread = 8,
   verbose = TRUE
 )
 
@@ -653,7 +651,7 @@ merged_taxonomy <- assignTaxonomy(
   gtdb_tax,
   minBoot = 70,
   tryRC = TRUE,
-  multithread = FALSE
+  multithread = 8
 )
 
 merged_taxonomy_sp_raw <- addSpecies(
@@ -667,17 +665,15 @@ merged_taxonomy_sp_raw <- addSpecies(
 # Data frame with taxonomy
 # Add md5 sum for shorter unique ID of sequence
 # Ad ASV#### identifier for ease of use
-merged_taxonomy_sp_tmp <- merged_taxonomy_sp_raw |>
+merged_taxonomy_sp_tmp <- merged_taxonomy_sp_raw |> 
   as.data.frame() |>
   rownames_to_column("Seq") |>
-  bind_cols(
-    md5 = map_chr(.$Seq, function(x) digest::digest(x, algo = "md5"))
-  ) |>
-  mutate(
-    ID = 1:nrow(.),
-    ID = str_glue("ASV{id}", id = str_pad(ID, width = 4, pad = "0")),
-    ID = as.character(ID)
-  ) |>
+  group_by(Seq) |> 
+  mutate(md5 = digest::digest(Seq, algo = "md5")) |> 
+  ungroup() |>  
+  mutate(ID = row_number(),
+         ID = str_glue("ASV{id}", id = str_pad(ID, width = 4, pad = "0")),
+         ID = as.character(ID)) |> 
   relocate(ID, md5)
 
 tax_lvl <- merged_taxonomy_sp_tmp |>
@@ -689,8 +685,8 @@ tax_lvl <- merged_taxonomy_sp_tmp |>
 # Add full name
 # Add unclassified in case of missing level
 merged_taxonomy_sp <- merged_taxonomy_sp_tmp |>
-  mutate(full_levels = tax_lvl) |>
   mutate(
+    full_levels = tax_lvl,
     Name = case_when(
       full_levels == 1 ~ str_c("Unclassified", Kingdom, sep = " "),
       full_levels == 2 ~ str_c("Unclassified", Phylum, sep = " "),
@@ -762,7 +758,7 @@ ASV_df <- ASV_df_unfilt |>
 
 # Print
 ASV_df |>
-  head
+  head()
 ```
 
 ## Write tables and tree to file
@@ -773,11 +769,9 @@ Check_point("Are the file names adjusted?")
 # Give a name to your files
 file_prefix <- "Test_run"
 
-out_asv_file <- paste(file_prefix, "ASV_table.tsv", sep = "_") |>
-  file.path(out_dir, .)
+out_asv_file <-  file.path(out_dir, paste(file_prefix, "ASV_table.tsv", sep = "_"))
 
-out_tax_file <- paste(file_prefix, "ASV_taxonomy.tsv", sep = "_") |>
-  file.path(out_dir, .)
+out_tax_file <- file.path(out_dir, paste(file_prefix, "ASV_taxonomy.tsv", sep = "_"))
 
 write_tsv(ASV_df, out_asv_file)
 write_tsv(merged_taxonomy_filt, out_tax_file)
@@ -838,13 +832,12 @@ ASV_ML_mod <- phangorn::optim.pml(
 # Save tree to object
 ASV_ML_tree <- ASV_ML_mod$tree
 ASV_ML_tree |>
-  class
+  class()
 ```
 
 ```{r}
 # Write tree file
-out_tree_file <- paste(file_prefix, "ASV_tree.tre", sep = "_") |>
-  file.path(out_dir, .)
+out_tree_file <-  file.path(out_dir, paste(file_prefix, "ASV_tree.tre", sep = "_"))
 
 ape::write.tree(ASV_ML_tree, file = out_tree_file)
 ```

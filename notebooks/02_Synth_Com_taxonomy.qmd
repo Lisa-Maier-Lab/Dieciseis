@@ -7,8 +7,12 @@ format: html
 
 Jacobo de la Cuesta-Zuluaga. December 2023.
 
-This is the second notebook of the Maier Lab's 16S rRNA amplicon sequencing workflow.
-*Note* that is only needed if you are processing the sequences of a synthetic community such as EED or Com20. If you are processing complex samples, e.g. human feces, you don't need to run this notebook.
+This is the second notebook of the Maier Lab's 16S rRNA amplicon sequencing 
+workflow.
+
+*Note* that is only needed if you are processing the sequences of a synthetic 
+community such as EED or Com20. If you are processing complex samples, e.g. human
+feces, you don't need to run this notebook.
 
 In the last notebook we processed the raw sequences, genertated ASVs and performed
 a general taxonomic classification. Here we will use full-length references to
@@ -28,16 +32,11 @@ library(conflicted)
 ```
 
 ```{r}
-# Load helper functions
-source("../bin/Helper_functions.R")
-```
-
-```{r}
 # Solve conflics with certain function names
-conflict_prefer("filter", "dplyr")
-conflict_prefer("slice", "dplyr")
-conflict_prefer("rename", "dplyr")
-conflict_prefer("setdiff", "base")
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::slice)
+conflicts_prefer(dplyr::rename)
+conflicts_prefer(base::setdiff)
 ```
 
 # Load files
@@ -47,12 +46,28 @@ tables of the detected ASVs that were generated using `DADA2` in the first noteb
 Make sure to adapt the paths to the output directory as needed.
 
 ```{r}
-Check_point("Are the base and out directories filled?")
 # TODO make sure the directories are correct
-base_dir = "../test"
 
-out_dir = file.path(base_dir, "dieciseis_out")
+# Base directory
+# This should be the path to the dieciseis repo
+base_dir = ""
+stopifnot(base_dir != "")
 ```
+
+```{r}
+# Test directory
+test_dir <- file.path(base_dir, "test")
+
+# Output directory
+# Change this to the path where you want to save your results
+out_dir <- file.path(test_dir, "dieciseis_out")
+```
+
+```{r}
+# Load helper functions
+source(file.path(base_dir, "bin/Helper_functions.R"))
+```
+
 
 ```{r}
 # Load tables
@@ -74,7 +89,7 @@ of the species in your samples.
 ```{r}
 Check_point("Is the path to the reference files correct?")
 # Reference dbs
-ref_dir = "../reference_files"
+ref_dir = file.path(base_dir,"reference_files")
 
 # Load reference files
 # TODO make sure the corresponding taxonomy files are loaded
@@ -239,6 +254,27 @@ Prop_reads %>%
   mutate(Same = (comm_reads/n_reads)*100)
 ```
 
+# ASVs not from community
+We can also check the classification of the ASVs that correspond to taxa
+not present in the community.
+```{r}
+ASV_noncommunity = ASV_df %>% 
+  pivot_longer(cols = -Sample, names_to = "ID", values_to = "Reads") %>% 
+  filter(Reads > 0, 
+         !(ID %in% SynthCom_taxonomy_collapse$ID)) %>% 
+  left_join(merged_taxonomy_sp, by = join_by("ID")) |> 
+  arrange(Sample, desc(Reads))
+```
+
+You can do a quick check by blasting the amplicon sequence of a particular ASV
+or taxon. For example, you can copy and paste a given sequence below:
+```{r}
+ASV_noncommunity |> 
+  filter(Name == "Unclassified Clostridium_F") |> 
+  pull(Seq)
+```
+
+
 # Write tables
 
 Finally, the tables with the collapsed species abundances and taxonomic 
@@ -252,14 +288,16 @@ Check_point("Are the file names adjusted?")
 # Give a name to your files
 file_prefix = "Test_run"
 
-out_collapsed_file = paste(file_prefix, "collapsed.tsv", sep = "_") %>% 
-  file.path(out_dir, .)
+out_collapsed_file = file.path(out_dir, paste(file_prefix, "collapsed.tsv", sep = "_"))
 
-out_synthcom_tax_file = paste(file_prefix, "exact_tax.tsv", sep = "_") %>% 
-  file.path(out_dir, .)
+out_synthcom_tax_file = file.path(out_dir, paste(file_prefix, "exact_tax.tsv", sep = "_"))
+
+out_non_community_file = file.path(out_dir, paste(file_prefix, "noncommunity.tsv", sep = "_")) 
 
 write_tsv(SynthCom_colapsed, out_collapsed_file)
 write_tsv(SynthCom_df, out_synthcom_tax_file)
+write_tsv(ASV_noncommunity, out_non_community_file)
+
 ```
 
 
