@@ -23,4 +23,4 @@ Example_df = data.frame(forward = F_files, reverse = R_files) |>
 
 # Write
 Example_df |> 
-  write_tsv("/mnt/ceph_1/dm_main/projects/Dieciseis/test/test_samplesfile.tsv")
+  write_tsv("/PATH/TO/Dieciseis/test/test_samplesfile.tsv")
