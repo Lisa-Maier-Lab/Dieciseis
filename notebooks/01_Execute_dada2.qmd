@@ -81,7 +81,7 @@ source(file.path(base_dir, "bin/Helper_functions.R"))
 
 ```{r}
 # TODO make sure the path to the reference files is correct
-Check_point("Is the path to the reference files correct?")
+# Check_point("Is the path to the reference files correct?")
 
 # Reference dbs
 ref_dir = file.path(base_dir,"reference_files")
@@ -134,7 +134,7 @@ obtained in newer sequencing runs, after 2025.
 Here, you need to select what kind of samples you have:
 ```{r}
 # # TODO set error profile
-Check_point("Did you select the appropriate type of error profile?")
+# Check_point("Did you select the appropriate type of error profile?")
 
 # options: linear or binned
 error_profile_type <- "binned"
@@ -188,9 +188,9 @@ and a reverse file.
 
 ```{r}
 # TODO make sure the patterns are correct
-Check_point(
-  "Is the correct file name pattern for Forward and Reverse reads added?"
-)
+# Check_point(
+#   "Is the correct file name pattern for Forward and Reverse reads added?"
+# )
 
 forward_pattern <- "_R1_001.fastq.gz"
 reverse_pattern <- "_R2_001.fastq.gz"
@@ -237,9 +237,9 @@ specified another (e.g. `binned`), you will need to change this above.
 
 ```{r}
 # TODO make sure the the error profile is the right one
-Check_point(
-  "Is the correct error profile selected above?"
-)
+# Check_point(
+#   "Is the correct error profile selected above?"
+# )
 
 # If you have a binned quality
 # Change if you have different values from the chunk above
@@ -340,9 +340,9 @@ and consider the quality of the reads.
 # `V4` (e.g. from NCCT)
 V_region = "V3-V4"
 
-Check_point(
-  "Did you check which hypervariable region are you sequencing?"
-)
+# Check_point(
+#   "Did you check which hypervariable region are you sequencing?"
+# )
 
 if (V_region == "V4") {
   trim_left <- c(23, 24)
@@ -368,7 +368,7 @@ filtered_trimmed <- filterAndTrim(
   rm.phix = TRUE, # filter matches against the phiX
   compress = TRUE,
   verbose = TRUE,
-  multithread = 8,
+  multithread = FALSE,
   matchIDs = TRUE
 )
 ```
@@ -420,7 +420,7 @@ forward_errors <- learnErrors(
   forward_filt_reads,
   nbases = 2e8,
   randomize = TRUE,
-  multithread = 8,
+  multithread = FALSE,
   verbose = TRUE,
   errorEstimationFunction = error_function
 )
@@ -436,7 +436,7 @@ reverse_errors <- learnErrors(
   reverse_filt_reads,
   nbases = 2e8,
   randomize = TRUE,
-  multithread = 8,
+  multithread = FALSE,
   verbose = TRUE,
   errorEstimationFunction = error_function
 )
@@ -473,7 +473,7 @@ forward_derep <- map(forward_filt_reads, function(filt_fq) {
 })
 
 forward_dada <- map(forward_derep, function(derep_obj) {
-  dada(derep_obj, err = forward_errors, multithread = 8, verbose = TRUE)
+  dada(derep_obj, err = forward_errors, multithread = FALSE, verbose = TRUE)
 })
 ```
 
@@ -484,7 +484,7 @@ reverse_derep <- map(reverse_filt_reads, function(filt_fq) {
 })
 
 reverse_dada <- map(reverse_derep, function(derep_obj) {
-  dada(derep_obj, err = reverse_errors, multithread = 8, verbose = TRUE)
+  dada(derep_obj, err = reverse_errors, multithread = FALSE, verbose = TRUE)
 })
 ```
 
@@ -535,7 +535,7 @@ Min_len <- 393
 Max_len <- 426
 
 # TODO Check that the size range makes sense
-Check_point("Was the amplicon size range adjusted accordingly?")
+# Check_point("Was the amplicon size range adjusted accordingly?")
 
 seq_table <- seq_table_raw[,
   nchar(colnames(seq_table_raw)) %in% Min_len:Max_len
@@ -562,7 +562,7 @@ to others during PCR.
 seq_table_dechimered <- removeBimeraDenovo(
   seq_table,
   method = "consensus",
-  multithread = 8,
+  multithread = FALSE,
   verbose = TRUE
 )
 
@@ -651,7 +651,7 @@ merged_taxonomy <- assignTaxonomy(
   gtdb_tax,
   minBoot = 70,
   tryRC = TRUE,
-  multithread = 8
+  multithread = FALSE
 )
 
 merged_taxonomy_sp_raw <- addSpecies(
@@ -764,7 +764,7 @@ ASV_df |>
 ## Write tables and tree to file
 ```{r}
 # TODO Change the file names if needed
-Check_point("Are the file names adjusted?")
+# Check_point("Are the file names adjusted?")
 
 # Give a name to your files
 file_prefix <- "Test_run"
